@@ -1,4 +1,5 @@
 import Canvas from "./components/canvas";
+import Footer from "./components/Footer";
 import Header from "./components/Header";
 import Sidebar from "./components/sidebar/SidebarPanel";
 import Toolbar from "./components/Toolbar";
@@ -16,6 +17,7 @@ export default function Page() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }
