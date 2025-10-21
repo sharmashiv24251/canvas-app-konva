@@ -11,6 +11,7 @@ export type BaseEl = {
 export type RectEl = BaseEl & {
   type: "rect";
   x: number; y: number; width: number; height: number; fill: string;
+  cornerRadius?: number;
 };
 
 export type CircleEl = BaseEl & {
@@ -21,15 +22,14 @@ export type CircleEl = BaseEl & {
 export type ImageEl = BaseEl & {
   type: "image";
   x: number; y: number; width: number; height: number; src: string;
+  cornerRadius?: number;
 };
 
 export type ArrowEl = BaseEl & {
     type: "arrow";
-    x: number;
-    y: number;
+    x: number; y: number;
     points: [number, number, number, number];
-    stroke: string;
-    strokeWidth: number;
+    stroke: string; strokeWidth: number;
   };
 
 export type TextEl = BaseEl & {

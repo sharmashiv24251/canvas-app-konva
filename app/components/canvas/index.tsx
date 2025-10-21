@@ -318,7 +318,7 @@ export default function Canvas() {
                       height={el.height}
                       rotation={el.rotation || 0}
                       fill={el.fill}
-                      cornerRadius={14}
+                      cornerRadius={el.cornerRadius ?? 0}
                       draggable
                       dragBoundFunc={dragBoundFor(el)}
                       onDragEnd={(e) =>

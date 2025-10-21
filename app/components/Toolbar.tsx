@@ -254,19 +254,6 @@ export default function Toolbar() {
               <Redo2 className="w-[18px] h-[18px]" />
             </IconButton>
           </div>
-
-          <div className="flex-1" />
-
-          <div className="hidden md:flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/0 px-2.5 h-9 text-[12px] text-slate-300/90">
-              <ZoomIn className="w-4 h-4" />
-              <span className="tabular-nums">100%</span>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/0 px-2.5 h-9 text-[12px] text-slate-300/90">
-              <Ruler className="w-4 h-4" />
-              <span>Snap: 8px</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
