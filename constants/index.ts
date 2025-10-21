@@ -1,4 +1,11 @@
-import { CanvasState } from "./types/canvas";
+export * from "./canvas";
+export * from "./ui";
+export * from "./elements";
+export * from "./keyboard";
+export * from "./dom";
+
+
+import { CanvasState } from "@/types/canvas";
 
 export const INITIAL_CANVAS_STATE: Omit<CanvasState, "past" | "future"> = {
     elements: [

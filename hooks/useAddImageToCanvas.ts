@@ -4,6 +4,9 @@ import { useAppDispatch } from "@/store/hooks";
 import { addElement } from "@/store/canvasSlice";
 import type { ImageEl } from "@/types/canvas";
 import { loadImageSize } from "@/lib/helpers";
+import { CANVAS_SHELL_ID } from "@/constants/dom";
+import { STAGE_HEIGHT } from "@/constants/canvas";
+import { IMAGE_TARGET_WIDTH } from "@/constants/canvas";
 
 type Opts = {
   /** The element that wraps your Stage (used to compute center X). */
@@ -15,32 +18,51 @@ type Opts = {
 };
 
 export function useAddImageToCanvas(
-  { canvasShellId = "canvas-shell", targetWidth = 200, stageHeight = 620 }: Opts = {}
+  { canvasShellId = CANVAS_SHELL_ID, targetWidth = IMAGE_TARGET_WIDTH, stageHeight = STAGE_HEIGHT }: Opts = {}
 ) {
   const dispatch = useAppDispatch();
 
   const getCenter = () => {
     // Only read DOM at call time (keeps SSR/hydration happy)
-    const shell = typeof document !== "undefined" ? document.getElementById(canvasShellId) : null;
-    const width = shell?.clientWidth ?? (typeof window !== "undefined" ? window.innerWidth : targetWidth);
+    const shell =
+      typeof document !== "undefined"
+        ? document.getElementById(canvasShellId)
+        : null;
+
+    // prefer shell width; fall back to window width; finally to targetWidth
+    const width =
+      (shell?.clientWidth ??
+        (typeof window !== "undefined" ? window.innerWidth : undefined)) ??
+      targetWidth;
+
     const cx = Math.round(width / 2);
     const cy = Math.round(stageHeight / 2);
     return { cx, cy };
   };
 
-  const addImageFromSrc = async (src: string, name = "Image", width = targetWidth) => {
+  const addImageFromSrc = async (
+    src: string,
+    name = "Image",
+    width = targetWidth
+  ) => {
+    if (!src) return;
+
+    // Fallbacks stay the same, but ensure >0 so we don't divide by zero
     let natW = 200;
     let natH = 220;
     try {
       const meta = await loadImageSize(src);
-      natW = meta.width || 200;
-      natH = meta.height || 220;
+      if (meta && Number.isFinite(meta.width) && Number.isFinite(meta.height)) {
+        natW = Math.max(1, meta.width);
+        natH = Math.max(1, meta.height);
+      }
     } catch {
       // ignore; keep fallback
     }
 
-    const w = width;
-    const h = Math.round(w * (natH / natW));
+    const w = Math.max(1, Math.round(width));
+    const h = Math.max(1, Math.round(w * (natH / natW)));
+
     const { cx, cy } = getCenter();
     const x = cx - Math.round(w / 2);
     const y = cy - Math.round(h / 2);
@@ -53,17 +75,19 @@ export function useAddImageToCanvas(
       height: h,
       src,
       rotation: 0,
-      name,
+      name: name || "Image",
     };
+
     dispatch(addElement(el));
   };
 
   const addImageFromFile = async (file: File) => {
+    if (!file) return;
     const src = URL.createObjectURL(file);
     try {
       await addImageFromSrc(src, file.name || "Image");
     } finally {
-      // Optional: revoke if you later reload via <img src={src}> elsewhere.
+      // Optional: revoke after you replace src elsewhere with a permanent URL
       // setTimeout(() => URL.revokeObjectURL(src), 0);
     }
   };

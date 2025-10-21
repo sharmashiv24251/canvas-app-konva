@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Stage,
   Layer,
@@ -12,8 +12,16 @@ import {
   Arrow as KonvaArrow,
 } from "react-konva";
 import useImage from "use-image";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { select, updateElement } from "@/store/canvasSlice";
+
+import { useStageSize } from "@/hooks/useStageSize";
+import { useCanvas } from "@/hooks/useCanvas";
+import {
+  STAGE_HEIGHT,
+  CANVAS_SHELL_ID,
+  TRANSFORMER_STYLE,
+  TRANSFORM_MIN_SIZE,
+} from "@/constants";
+
 import type {
   AnyEl,
   RectEl,
@@ -22,12 +30,9 @@ import type {
   RingEl,
   TextEl,
   ArrowEl,
-} from "@/types/canvas";
+} from "@/types/canvas"; // <-- your path: "@/types/canvas"
 
-const clamp = (v: number, min: number, max: number) =>
-  Math.max(min, Math.min(v, max));
-const STAGE_HEIGHT = 620;
-
+/** Pure image node (no Redux). */
 function ImageNode({
   el,
   registerRef,
@@ -46,9 +51,7 @@ function ImageNode({
   const [img] = useImage(el.src);
   return (
     <KonvaImage
-      ref={(node) => {
-        registerRef(node);
-      }}
+      ref={registerRef}
       x={el.x}
       y={el.y}
       width={el.width}
@@ -66,251 +69,70 @@ function ImageNode({
 }
 
 export default function Canvas() {
-  const dispatch = useAppDispatch();
-  const { elements: shapes, selectedId } = useAppSelector((s) => s.canvas);
+  // 1) Stage size from ResizeObserver (no Redux)
+  const { containerRef, width: stageW } = useStageSize();
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const [{ width: stageW }, setStageSize] = useState({ width: 0 });
+  // 2) All canvas logic hidden in the hook (Redux inside the hook only)
+  const {
+    elements,
+    selectedId,
+    selectById,
+    clearSelection,
+    update, // update(id, patch)
+    nodeRefs, // ref map for Transformer
+    dragBoundFor, // per-element drag bound function
+    onTransformEnd, // Konva Transformer end-handler
+  } = useCanvas({ stageWidth: stageW });
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      const { width } = entries[0].contentRect;
-      setStageSize({ width });
-    });
-    ro.observe(canvasRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  const shapeRefs = useRef<Record<string, any>>({});
+  // 3) Transformer wiring (pure UI)
   const transformerRef = useRef<any>(null);
-
   useEffect(() => {
     const tr = transformerRef.current;
     if (!tr) return;
+
     if (!selectedId) {
       tr.nodes([]);
       tr.getLayer()?.batchDraw();
       return;
     }
-    const node = shapeRefs.current[selectedId];
+    const node = nodeRefs.current[selectedId];
     if (node) {
       tr.nodes([node]);
       tr.getLayer()?.batchDraw();
     }
-  }, [selectedId, shapes]);
-
-  const dragBoundFor = (s: AnyEl) => (pos: { x: number; y: number }) => {
-    const w = stageW,
-      h = STAGE_HEIGHT;
-
-    if (
-      s.type === "rect" ||
-      s.type === "image" ||
-      s.type === "text" ||
-      s.type === "arrow"
-    ) {
-      // treat as top-left box for bounds
-      const boxW =
-        s.type === "rect"
-          ? (s as RectEl).width
-          : s.type === "image"
-          ? (s as ImageEl).width
-          : s.type === "text"
-          ? Math.max(24, shapeRefs.current[s.id]?.width?.() ?? 120)
-          : // arrow: approximate by its bbox (konva computes width/height)
-            Math.max(24, shapeRefs.current[s.id]?.width?.() ?? 120);
-
-      const boxH =
-        s.type === "rect"
-          ? (s as RectEl).height
-          : s.type === "image"
-          ? (s as ImageEl).height
-          : s.type === "text"
-          ? Math.max(24, shapeRefs.current[s.id]?.height?.() ?? 24)
-          : Math.max(24, shapeRefs.current[s.id]?.height?.() ?? 24);
-
-      return {
-        x: clamp(pos.x, 0, Math.max(0, w - boxW)),
-        y: clamp(pos.y, 0, Math.max(0, h - boxH)),
-      };
-    }
-
-    // circle / ring use center coords
-    if (s.type === "circle") {
-      const r = (s as CircleEl).radius;
-      return {
-        x: clamp(pos.x, r, Math.max(r, w - r)),
-        y: clamp(pos.y, r, Math.max(r, h - r)),
-      };
-    }
-    if (s.type === "ring") {
-      const r = (s as RingEl).outerRadius;
-      return {
-        x: clamp(pos.x, r, Math.max(r, w - r)),
-        y: clamp(pos.y, r, Math.max(r, h - r)),
-      };
-    }
-    return pos;
-  };
-
-  const handleTransformEnd = (node: any, s: AnyEl) => {
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    const rotation = node.rotation();
-
-    if (s.type === "rect") {
-      const rect = s as RectEl;
-      const newW = Math.max(24, Math.round(rect.width * scaleX));
-      const newH = Math.max(24, Math.round(rect.height * scaleY));
-      let x = node.x(),
-        y = node.y();
-      x = clamp(x, 0, Math.max(0, stageW - newW));
-      y = clamp(y, 0, Math.max(0, STAGE_HEIGHT - newH));
-      dispatch(
-        updateElement({
-          id: s.id,
-          patch: { x, y, width: newW, height: newH, rotation },
-        })
-      );
-    } else if (s.type === "image") {
-      const img = s as ImageEl;
-      const newW = Math.max(24, Math.round(img.width * scaleX));
-      const newH = Math.max(24, Math.round(img.height * scaleY));
-      let x = node.x(),
-        y = node.y();
-      x = clamp(x, 0, Math.max(0, stageW - newW));
-      y = clamp(y, 0, Math.max(0, STAGE_HEIGHT - newH));
-      dispatch(
-        updateElement({
-          id: s.id,
-          patch: { x, y, width: newW, height: newH, rotation },
-        })
-      );
-    } else if (s.type === "circle") {
-      const c = s as CircleEl;
-      const r = Math.max(12, Math.round(c.radius * Math.max(scaleX, scaleY)));
-      let cx = node.x(),
-        cy = node.y();
-      cx = clamp(cx, r, Math.max(r, stageW - r));
-      cy = clamp(cy, r, Math.max(r, STAGE_HEIGHT - r));
-      dispatch(
-        updateElement({ id: s.id, patch: { cx, cy, radius: r, rotation } })
-      );
-    } else if (s.type === "ring") {
-      const r = s as RingEl;
-      const newOuter = Math.max(
-        12,
-        Math.round(r.outerRadius * Math.max(scaleX, scaleY))
-      );
-      const scaleInner = r.innerRadius / r.outerRadius;
-      const newInner = Math.max(6, Math.round(newOuter * scaleInner));
-      let cx = node.x(),
-        cy = node.y();
-      cx = clamp(cx, newOuter, Math.max(newOuter, stageW - newOuter));
-      cy = clamp(cy, newOuter, Math.max(newOuter, STAGE_HEIGHT - newOuter));
-      dispatch(
-        updateElement({
-          id: s.id,
-          patch: {
-            cx,
-            cy,
-            outerRadius: newOuter,
-            innerRadius: newInner,
-            rotation,
-          },
-        })
-      );
-    } else if (s.type === "text") {
-      const t = s as TextEl;
-      // Scale font size using Y
-      const newFontSize = Math.max(8, Math.round(t.fontSize * scaleY));
-      let x = node.x(),
-        y = node.y();
-      // approximate box
-      const w = Math.max(
-        24,
-        Math.round((shapeRefs.current[s.id]?.width?.() ?? 120) * scaleX)
-      );
-      const h = Math.max(
-        16,
-        Math.round(
-          (shapeRefs.current[s.id]?.height?.() ?? newFontSize) *
-            (scaleY / (newFontSize / t.fontSize))
-        )
-      );
-      x = clamp(x, 0, Math.max(0, stageW - w));
-      y = clamp(y, 0, Math.max(0, STAGE_HEIGHT - h));
-      dispatch(
-        updateElement({
-          id: s.id,
-          patch: { x, y, fontSize: newFontSize, rotation },
-        })
-      );
-    } else if (s.type === "arrow") {
-      const a = s as ArrowEl;
-      // Scale vector between p1 and p2, keep node at same x/y (konva positions the shape by x/y offset)
-      const [x1, y1, x2, y2] = a.points;
-      const dx = (x2 - x1) * scaleX;
-      const dy = (y2 - y1) * scaleY;
-      const newPoints: [number, number, number, number] = [
-        x1,
-        y1,
-        x1 + dx,
-        y1 + dy,
-      ];
-      let x = node.x(),
-        y = node.y();
-      // clamp by bbox
-      const bboxW = Math.max(24, Math.abs(dx));
-      const bboxH = Math.max(24, Math.abs(dy));
-      x = clamp(x, 0, Math.max(0, stageW - bboxW));
-      y = clamp(y, 0, Math.max(0, STAGE_HEIGHT - bboxH));
-      dispatch(
-        updateElement({
-          id: s.id,
-          patch: { points: newPoints, rotation /* keep stroke/strokeWidth */ },
-        })
-      );
-      // keep position in bounds too
-      node.x(x);
-      node.y(y);
-    }
-
-    node.scaleX(1);
-    node.scaleY(1);
-  };
+  }, [selectedId, elements, nodeRefs]);
 
   return (
     <section className="min-w-0">
       <div className="relative rounded-2xl border border-white/10 bg-white overflow-hidden shadow-2xl shadow-black/40">
         {/* REAL canvas wrapper (bounds) */}
         <div
-          id="canvas-shell"
-          ref={canvasRef}
+          id={CANVAS_SHELL_ID}
+          ref={containerRef}
           className="relative mx-6 mt-12 rounded-xl overflow-hidden"
           style={{ height: `${STAGE_HEIGHT}px` }}
         >
           <div className="pointer-events-none absolute inset-0 rounded-xl border-2 border-dashed border-slate-900/10 opacity-0 hover:opacity-100 transition-opacity" />
+
           <Stage
             width={stageW}
             height={STAGE_HEIGHT}
             onMouseDown={(e) => {
-              if (e.target === e.target.getStage()) dispatch(select(null));
+              if (e.target === e.target.getStage()) clearSelection();
             }}
             onTouchStart={(e) => {
-              if (e.target === e.target.getStage()) dispatch(select(null));
+              if (e.target === e.target.getStage()) clearSelection();
             }}
           >
             <Layer>
-              {shapes.map((s) => {
+              {elements.map((s: AnyEl) => {
                 if (s.type === "rect") {
                   const el = s as RectEl;
                   return (
                     <Rect
                       key={el.id}
                       ref={(node) => {
-                        shapeRefs.current[el.id] = node;
+                        nodeRefs.current[el.id] = node;
                       }}
                       x={el.x}
                       y={el.y}
@@ -322,44 +144,37 @@ export default function Canvas() {
                       draggable
                       dragBoundFunc={dragBoundFor(el)}
                       onDragEnd={(e) =>
-                        dispatch(
-                          updateElement({
-                            id: el.id,
-                            patch: { x: e.target.x(), y: e.target.y() },
-                          })
-                        )
+                        update(el.id, { x: e.target.x(), y: e.target.y() })
                       }
-                      onTransformEnd={(e) => handleTransformEnd(e.target, el)}
-                      onClick={() => dispatch(select(el.id))}
-                      onTap={() => dispatch(select(el.id))}
+                      onTransformEnd={(e) => onTransformEnd(e.target, el)}
+                      onClick={() => selectById(el.id)}
+                      onTap={() => selectById(el.id)}
                     />
                   );
                 }
+
                 if (s.type === "image") {
                   const el = s as ImageEl;
                   return (
                     <ImageNode
                       key={el.id}
                       el={el}
-                      registerRef={(node) => {
-                        shapeRefs.current[el.id] = node;
-                      }}
-                      onSelect={() => dispatch(select(el.id))}
+                      registerRef={(node) => (nodeRefs.current[el.id] = node)}
+                      onSelect={() => selectById(el.id)}
                       dragBoundFunc={dragBoundFor(el)}
-                      onDragEnd={(x, y) =>
-                        dispatch(updateElement({ id: el.id, patch: { x, y } }))
-                      }
-                      onTransformEnd={(node) => handleTransformEnd(node, el)}
+                      onDragEnd={(x, y) => update(el.id, { x, y })}
+                      onTransformEnd={(node) => onTransformEnd(node, el)}
                     />
                   );
                 }
+
                 if (s.type === "circle") {
                   const el = s as CircleEl;
                   return (
                     <Circle
                       key={el.id}
                       ref={(node) => {
-                        shapeRefs.current[el.id] = node;
+                        nodeRefs.current[el.id] = node;
                       }}
                       x={el.cx}
                       y={el.cy}
@@ -368,33 +183,23 @@ export default function Canvas() {
                       fill={el.fill}
                       draggable
                       dragBoundFunc={dragBoundFor(el)}
-                      onDragEnd={(e) => {
-                        const cx = e.target.x(),
-                          cy = e.target.y(),
-                          r = el.radius;
-                        dispatch(
-                          updateElement({
-                            id: el.id,
-                            patch: {
-                              cx: clamp(cx, r, Math.max(r, stageW - r)),
-                              cy: clamp(cy, r, Math.max(r, STAGE_HEIGHT - r)),
-                            },
-                          })
-                        );
-                      }}
-                      onTransformEnd={(e) => handleTransformEnd(e.target, el)}
-                      onClick={() => dispatch(select(el.id))}
-                      onTap={() => dispatch(select(el.id))}
+                      onDragEnd={(e) =>
+                        update(el.id, { cx: e.target.x(), cy: e.target.y() })
+                      }
+                      onTransformEnd={(e) => onTransformEnd(e.target, el)}
+                      onClick={() => selectById(el.id)}
+                      onTap={() => selectById(el.id)}
                     />
                   );
                 }
+
                 if (s.type === "ring") {
                   const el = s as RingEl;
                   return (
                     <KonvaRing
                       key={el.id}
                       ref={(node) => {
-                        shapeRefs.current[el.id] = node;
+                        nodeRefs.current[el.id] = node;
                       }}
                       x={el.cx}
                       y={el.cy}
@@ -404,33 +209,23 @@ export default function Canvas() {
                       fill={el.fill}
                       draggable
                       dragBoundFunc={dragBoundFor(el)}
-                      onDragEnd={(e) => {
-                        const cx = e.target.x(),
-                          cy = e.target.y(),
-                          r = el.outerRadius;
-                        dispatch(
-                          updateElement({
-                            id: el.id,
-                            patch: {
-                              cx: clamp(cx, r, Math.max(r, stageW - r)),
-                              cy: clamp(cy, r, Math.max(r, STAGE_HEIGHT - r)),
-                            },
-                          })
-                        );
-                      }}
-                      onTransformEnd={(e) => handleTransformEnd(e.target, el)}
-                      onClick={() => dispatch(select(el.id))}
-                      onTap={() => dispatch(select(el.id))}
+                      onDragEnd={(e) =>
+                        update(el.id, { cx: e.target.x(), cy: e.target.y() })
+                      }
+                      onTransformEnd={(e) => onTransformEnd(e.target, el)}
+                      onClick={() => selectById(el.id)}
+                      onTap={() => selectById(el.id)}
                     />
                   );
                 }
+
                 if (s.type === "text") {
                   const el = s as TextEl;
                   return (
                     <KonvaText
                       key={el.id}
                       ref={(node) => {
-                        shapeRefs.current[el.id] = node;
+                        nodeRefs.current[el.id] = node;
                       }}
                       x={el.x}
                       y={el.y}
@@ -441,19 +236,15 @@ export default function Canvas() {
                       draggable
                       dragBoundFunc={dragBoundFor(el)}
                       onDragEnd={(e) =>
-                        dispatch(
-                          updateElement({
-                            id: el.id,
-                            patch: { x: e.target.x(), y: e.target.y() },
-                          })
-                        )
+                        update(el.id, { x: e.target.x(), y: e.target.y() })
                       }
-                      onTransformEnd={(e) => handleTransformEnd(e.target, el)}
-                      onClick={() => dispatch(select(el.id))}
-                      onTap={() => dispatch(select(el.id))}
+                      onTransformEnd={(e) => onTransformEnd(e.target, el)}
+                      onClick={() => selectById(el.id)}
+                      onTap={() => selectById(el.id)}
                     />
                   );
                 }
+
                 // arrow
                 const el = s as ArrowEl;
                 return (
@@ -462,7 +253,7 @@ export default function Canvas() {
                     x={el.x}
                     y={el.y}
                     ref={(node) => {
-                      shapeRefs.current[el.id] = node;
+                      nodeRefs.current[el.id] = node;
                     }}
                     points={el.points}
                     stroke={el.stroke}
@@ -471,19 +262,11 @@ export default function Canvas() {
                     draggable
                     dragBoundFunc={dragBoundFor(el)}
                     onDragEnd={(e) =>
-                      dispatch(
-                        updateElement({
-                          id: el.id,
-                          patch: {
-                            x: e.target.x(),
-                            y: e.target.y(),
-                          },
-                        })
-                      )
+                      update(el.id, { x: e.target.x(), y: e.target.y() })
                     }
-                    onTransformEnd={(e) => handleTransformEnd(e.target, el)}
-                    onClick={() => dispatch(select(el.id))}
-                    onTap={() => dispatch(select(el.id))}
+                    onTransformEnd={(e) => onTransformEnd(e.target, el)}
+                    onClick={() => selectById(el.id)}
+                    onTap={() => selectById(el.id)}
                   />
                 );
               })}
@@ -493,7 +276,7 @@ export default function Canvas() {
                 rotateEnabled
                 resizeEnabled
                 boundBoxFunc={(oldBox, newBox) => {
-                  const MIN = 12;
+                  const MIN = TRANSFORM_MIN_SIZE ?? 12;
                   if (newBox.width < MIN || newBox.height < MIN) return oldBox;
                   if (newBox.x < 0 || newBox.y < 0) return oldBox;
                   if (
@@ -503,12 +286,12 @@ export default function Canvas() {
                     return oldBox;
                   return newBox;
                 }}
-                anchorStroke="#6366f1"
-                anchorFill="#ffffff"
-                anchorSize={8}
-                anchorCornerRadius={2}
-                borderStroke="#6366f1"
-                borderDash={[4, 4]}
+                anchorStroke={TRANSFORMER_STYLE.anchorStroke}
+                anchorFill={TRANSFORMER_STYLE.anchorFill}
+                anchorSize={TRANSFORMER_STYLE.anchorSize}
+                anchorCornerRadius={TRANSFORMER_STYLE.anchorCornerRadius}
+                borderStroke={TRANSFORMER_STYLE.borderStroke}
+                borderDash={TRANSFORMER_STYLE.borderDash}
               />
             </Layer>
           </Stage>

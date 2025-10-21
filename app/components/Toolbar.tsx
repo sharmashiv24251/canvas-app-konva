@@ -13,53 +13,53 @@ import {
   CircleDashed,
 } from "lucide-react";
 import IconButton from "./ui/IconButton";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { addElement, removeElement, undo, redo } from "@/store/canvasSlice";
-import type { RectEl, CircleEl, TextEl, RingEl } from "@/types/canvas";
-import { createSelector } from "@reduxjs/toolkit";
-import type { RootState } from "@/store";
+
 import { useAddImageToCanvas } from "@/hooks/useAddImageToCanvas";
+import { useCanvas } from "@/hooks/useCanvas"; // ← unified hook we defined
+import { CANVAS_SHELL_ID, STAGE_HEIGHT } from "@/constants"; // ← your constants
 
-const STAGE_HEIGHT = 620;
-
-// Memoized selector to avoid rerender warning
-const toolbarSel = createSelector(
-  (s: RootState) => s.canvas.selectedId,
-  (s: RootState) => s.canvas.past.length,
-  (s: RootState) => s.canvas.future.length,
-  (selectedId, pastLen, futureLen) => ({ selectedId, pastLen, futureLen })
-);
+import type { RectEl, CircleEl, TextEl, RingEl } from "@/types/canvas";
 
 export default function Toolbar() {
-  const dispatch = useAppDispatch();
-  const { selectedId, pastLen, futureLen } = useAppSelector(toolbarSel);
+  // stage width is needed by useCanvas for bounds;
+  // for Toolbar we can read it on demand (SSR-safe)
+  const getCenter = () => {
+    const shell =
+      typeof document !== "undefined"
+        ? document.getElementById(CANVAS_SHELL_ID)
+        : null;
 
-  // Shared image-adding logic (keeps aspect ratio, centers on canvas)
+    const width =
+      shell?.clientWidth ??
+      (typeof window !== "undefined" ? window.innerWidth : undefined) ??
+      0;
+
+    const cx = Math.round(width / 2);
+    const cy = Math.round(STAGE_HEIGHT / 2);
+    return { cx, cy, width };
+  };
+
+  // Core canvas hook — hides Redux. Pass stageWidth for accurate bounds.
+  const { width } = getCenter();
+  const { selectedId, remove, add, undo, redo, canUndo, canRedo } = useCanvas({
+    stageWidth: width,
+  });
+
+  // Image adder (also hides Redux)
   const { addImageFromFile, addImageFromSrc } = useAddImageToCanvas({
-    canvasShellId: "canvas-shell",
+    canvasShellId: CANVAS_SHELL_ID,
     stageHeight: STAGE_HEIGHT,
     targetWidth: 200,
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hydration-safe: render after mount to avoid SSR attr mismatches
+  // Hydration-safe
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const getCenter = () => {
-    const shell = document.getElementById("canvas-shell");
-    const width = shell?.clientWidth ?? window.innerWidth;
-    const height = STAGE_HEIGHT;
-    return {
-      cx: Math.round(width / 2),
-      cy: Math.round(height / 2),
-      width,
-      height,
-    };
-  };
-
+  // UI helpers
   const triggerImagePicker = () => fileInputRef.current?.click();
 
   const onImagePicked: React.ChangeEventHandler<HTMLInputElement> = async (
@@ -69,7 +69,6 @@ export default function Toolbar() {
     if (file) {
       await addImageFromFile(file);
     } else {
-      // fallback to your default asset if no file chosen
       await addImageFromSrc("/images/canvas-01.jpg", "Image");
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -90,7 +89,7 @@ export default function Toolbar() {
       rotation: 0,
       name: "Rectangle",
     };
-    dispatch(addElement(el));
+    add(el);
   };
 
   const addCircle = () => {
@@ -104,24 +103,22 @@ export default function Toolbar() {
       rotation: 0,
       name: "Circle",
     };
-    dispatch(addElement(el));
+    add(el);
   };
 
   const addArrow = () => {
     const { cx, cy } = getCenter();
     const len = 160;
-    dispatch(
-      addElement({
-        type: "arrow",
-        x: cx - Math.round(len / 2),
-        y: cy,
-        points: [0, 0, len, 0],
-        stroke: "#111827",
-        strokeWidth: 4,
-        rotation: 0,
-        name: "Arrow",
-      })
-    );
+    add({
+      type: "arrow",
+      x: cx - Math.round(len / 2),
+      y: cy,
+      points: [0, 0, len, 0],
+      stroke: "#111827",
+      strokeWidth: 4,
+      rotation: 0,
+      name: "Arrow",
+    });
   };
 
   const addText = () => {
@@ -136,7 +133,7 @@ export default function Toolbar() {
       rotation: 0,
       name: "Text",
     };
-    dispatch(addElement(el));
+    add(el);
   };
 
   const addRing = () => {
@@ -151,11 +148,11 @@ export default function Toolbar() {
       rotation: 0,
       name: "Ring",
     };
-    dispatch(addElement(el));
+    add(el);
   };
 
   const doDelete = () => {
-    if (selectedId) dispatch(removeElement(selectedId));
+    if (selectedId) remove(selectedId);
   };
 
   return (
@@ -230,16 +227,16 @@ export default function Toolbar() {
             <IconButton
               aria-label="Undo"
               tooltip="Undo"
-              onClick={() => dispatch(undo())}
-              disabled={pastLen === 0}
+              onClick={undo}
+              disabled={!canUndo}
             >
               <Undo2 className="w-[18px] h-[18px]" />
             </IconButton>
             <IconButton
               aria-label="Redo"
               tooltip="Redo"
-              onClick={() => dispatch(redo())}
-              disabled={futureLen === 0}
+              onClick={redo}
+              disabled={!canRedo}
             >
               <Redo2 className="w-[18px] h-[18px]" />
             </IconButton>

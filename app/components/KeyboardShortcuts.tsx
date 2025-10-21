@@ -1,65 +1,49 @@
 "use client";
 import { useEffect } from "react";
-import { createSelector } from "@reduxjs/toolkit";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import {
-  undo,
-  redo,
-  removeElement,
-  addElement,
-  select,
-} from "@/store/canvasSlice";
-import type { RootState } from "@/store";
+import { useCanvas } from "@/hooks/useCanvas";
+import { KEY, MOD } from "@/constants/keyboard";
 import type { AnyEl } from "@/types/canvas";
+import { newId, offsetBy } from "@/lib/helpers";
 
-// ── Clipboard payload format (plain text JSON) ────────────────────────────────
+// Clipboard payload format
 type CanvasClipboard = {
   kind: "canvas/elements";
   version: 1;
-  elements: AnyEl[]; // serialized selected elements
+  elements: AnyEl[];
 };
 
-// ── Selectors ────────────────────────────────────────────────────────────────
-const selectShortcuts = createSelector(
-  (s: RootState) => s.canvas.selectedId,
-  (s: RootState) => s.canvas.past.length,
-  (s: RootState) => s.canvas.future.length,
-  (selectedId, past, future) => ({
-    selectedId,
-    canUndo: past > 0,
-    canRedo: future > 0,
-  })
-);
+// ----- pure utilities -----
+function isFormTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  return (
+    el.isContentEditable ||
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT"
+  );
+}
 
-const selectSelectedElements = createSelector(
-  (s: RootState) => s.canvas.elements,
-  (s: RootState) => s.canvas.selectedId,
-  (elements, id) => {
-    if (!id) return [];
-    const el = elements.find((e) => e.id === id);
-    return el ? [el] : [];
-  }
-);
-
-// ── ID helper ────────────────────────────────────────────────────────────────
-const newId = () => "el_" + Math.random().toString(36).slice(2, 9);
-
-// ── Utilities ────────────────────────────────────────────────────────────────
 function offsetElement(el: AnyEl, dx = 16, dy = 16): AnyEl {
   const id = newId();
   switch (el.type) {
     case "rect":
-      return { ...el, id, x: el.x + dx, y: el.y + dy };
+      return { ...el, id, x: offsetBy(el.x, dx), y: offsetBy(el.y, dy) };
     case "image":
-      return { ...el, id, x: el.x + dx, y: el.y + dy };
+      return { ...el, id, x: offsetBy(el.x, dx), y: offsetBy(el.y, dy) };
     case "text":
-      return { ...el, id, x: el.x + dx, y: el.y + dy };
+      return { ...el, id, x: offsetBy(el.x, dx), y: offsetBy(el.y, dy) };
     case "circle":
-      return { ...el, id, cx: el.cx + dx, cy: el.cy + dy };
+      return { ...el, id, cx: offsetBy(el.cx, dx), cy: offsetBy(el.cy, dy) };
     case "ring":
-      return { ...el, id, cx: el.cx + dx, cy: el.cy + dy };
+      return { ...el, id, cx: offsetBy(el.cx, dx), cy: offsetBy(el.cy, dy) };
     case "arrow":
-      return { ...el, id, x: (el.x ?? 0) + dx, y: (el.y ?? 0) + dy };
+      return {
+        ...el,
+        id,
+        x: offsetBy(el.x ?? 0, dx),
+        y: offsetBy(el.y ?? 0, dy),
+      };
   }
 }
 
@@ -83,95 +67,98 @@ async function readClipboard(): Promise<CanvasClipboard | null> {
   }
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ----- component (listener only; no Redux) -----
 export default function KeyboardShortcuts() {
-  const dispatch = useAppDispatch();
-  const { selectedId, canUndo, canRedo } = useAppSelector(selectShortcuts);
-  const selectedEls = useAppSelector(selectSelectedElements);
+  const {
+    // state
+    selectedId,
+    selected,
+    canUndo,
+    canRedo,
+    // actions
+    undo,
+    redo,
+    remove,
+    add,
+    selectById,
+  } = useCanvas({ stageWidth: 0 }); // not used here by the hook logic
 
   useEffect(() => {
     const onKeyDown = async (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      const inForm =
-        target?.isContentEditable ||
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT";
-
-      const cmd = e.metaKey;
-      const ctrl = e.ctrlKey;
-      const shift = e.shiftKey;
-      const key = e.key.toLowerCase();
+      const inForm = isFormTarget(e.target);
+      const key = e.key;
+      const lower = key.toLowerCase();
+      const cmdOrCtrl =
+        e.getModifierState(MOD.meta) || e.getModifierState(MOD.ctrl);
+      const shift = e.getModifierState(MOD.shift);
 
       // Undo: Cmd/Ctrl + Z
-      if ((cmd || ctrl) && !shift && key === "z") {
+      if (cmdOrCtrl && !shift && lower === KEY.z) {
         if (canUndo) {
           e.preventDefault();
-          dispatch(undo());
+          undo();
         }
         return;
       }
 
-      // Redo: Shift + Cmd/Ctrl + Z
-      if ((cmd || ctrl) && shift && key === "z") {
+      // Redo: Shift+Cmd/Ctrl+Z OR Ctrl+Y
+      if (
+        (cmdOrCtrl && shift && lower === KEY.z) ||
+        (!shift && lower === KEY.y && e.getModifierState(MOD.ctrl))
+      ) {
         if (canRedo) {
           e.preventDefault();
-          dispatch(redo());
+          redo();
         }
         return;
       }
 
-      // Delete selected element: Delete or Backspace (not while typing)
-      if (!inForm && (e.key === "Delete" || e.key === "Backspace")) {
+      // Delete selected element
+      if (!inForm && (key === KEY.delete || key === KEY.backspace)) {
         if (selectedId) {
           e.preventDefault();
-          dispatch(removeElement(selectedId));
+          remove(selectedId);
         }
         return;
       }
 
-      // COPY: Cmd/Ctrl + C
-      if (!inForm && (cmd || ctrl) && !shift && key === "c") {
-        if (selectedEls.length > 0) {
+      // Copy: Cmd/Ctrl + C
+      if (!inForm && cmdOrCtrl && !shift && lower === KEY.c) {
+        if (selected) {
           e.preventDefault();
           const payload: CanvasClipboard = {
             kind: "canvas/elements",
             version: 1,
-            elements: selectedEls,
+            elements: [selected],
           };
           await writeClipboard(payload);
         }
         return;
       }
 
-      // CUT: Cmd/Ctrl + X
-      if (!inForm && (cmd || ctrl) && !shift && key === "x") {
-        if (selectedEls.length > 0 && selectedId) {
+      // Cut: Cmd/Ctrl + X
+      if (!inForm && cmdOrCtrl && !shift && lower === KEY.x) {
+        if (selected && selectedId) {
           e.preventDefault();
           const payload: CanvasClipboard = {
             kind: "canvas/elements",
             version: 1,
-            elements: selectedEls,
+            elements: [selected],
           };
           await writeClipboard(payload);
-          dispatch(removeElement(selectedId));
+          remove(selectedId);
         }
         return;
       }
 
-      // PASTE: Cmd/Ctrl + V
-      if (!inForm && (cmd || ctrl) && !shift && key === "v") {
+      // Paste: Cmd/Ctrl + V
+      if (!inForm && cmdOrCtrl && !shift && lower === KEY.v) {
         e.preventDefault();
         const data = await readClipboard();
         if (data?.elements?.length) {
-          // paste the first for now (single-select UX)
           const pasted = offsetElement(data.elements[0]);
-          // If your reducer supports passing a full element with id, do this:
-          dispatch(addElement(pasted as AnyEl));
-          dispatch(select(pasted.id));
-          // If your addElement generates id internally, instead dispatch(addElement(rest))
-          // and select using what your reducer returns (or find the tail after dispatch).
+          add(pasted as AnyEl);
+          selectById(pasted.id);
         }
         return;
       }
@@ -179,7 +166,17 @@ export default function KeyboardShortcuts() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dispatch, selectedId, selectedEls, canUndo, canRedo]);
+  }, [
+    selectedId,
+    selected,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    remove,
+    add,
+    selectById,
+  ]);
 
   return null;
 }

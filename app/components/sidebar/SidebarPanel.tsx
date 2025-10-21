@@ -12,9 +12,7 @@ import {
   CircleDashed,
 } from "lucide-react";
 import SidebarListItem from "./SidebarListItem";
-
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { moveElementToIndex, select, removeElement } from "@/store/canvasSlice";
+import { useCanvas } from "@/hooks/useCanvas";
 import type {
   AnyEl,
   RectEl,
@@ -24,61 +22,50 @@ import type {
   ArrowEl,
   RingEl,
 } from "@/types/canvas";
-import { createSelector } from "@reduxjs/toolkit";
-import type { RootState } from "@/store";
-
-// Memoized selector → stable reference
-const sidebarSel = createSelector(
-  (s: RootState) => s.canvas.elements,
-  (s: RootState) => s.canvas.selectedId,
-  (elements, selectedId) => ({ elements, selectedId })
-);
 
 export default function Sidebar() {
-  const dispatch = useAppDispatch();
-  const { elements, selectedId } = useAppSelector(sidebarSel);
+  const {
+    elements,
+    elementsTopFirst,
+    selectedId,
+    selectById,
+    remove,
+    moveToIndex,
+    moveSelectedUp,
+    moveSelectedDown,
+  } = useCanvas({ stageWidth: 0 });
 
-  // Display topmost first
-  const display = useMemo(() => {
-    const list = [...elements].map((el, idx) => ({ el, arrayIndex: idx }));
-    list.reverse();
-    return list;
-  }, [elements]);
+  // Display topmost first (prefer from hook; fallback here if not provided)
+  const display =
+    elementsTopFirst ??
+    useMemo(() => {
+      const list = [...elements].map((el, idx) => ({ el, arrayIndex: idx }));
+      list.reverse();
+      return list;
+    }, [elements]);
 
   const selectedArrayIndex = selectedId
     ? elements.findIndex((e) => e.id === selectedId)
     : -1;
-
-  const moveSelectedUp = () => {
-    if (selectedArrayIndex < 0) return;
-    const to = Math.min(elements.length - 1, selectedArrayIndex + 1);
-    if (to !== selectedArrayIndex) {
-      dispatch(moveElementToIndex({ id: elements[selectedArrayIndex].id, to }));
-    }
-  };
-  const moveSelectedDown = () => {
-    if (selectedArrayIndex < 0) return;
-    const to = Math.max(0, selectedArrayIndex - 1);
-    if (to !== selectedArrayIndex) {
-      dispatch(moveElementToIndex({ id: elements[selectedArrayIndex].id, to }));
-    }
-  };
 
   const onDragStart =
     (id: string, displayIndex: number) =>
     (e: React.DragEvent<HTMLDivElement>) => {
       e.dataTransfer.setData("text/canvas-id", id);
       e.dataTransfer.setData("text/canvas-display-index", String(displayIndex));
-      dispatch(select(id));
+      selectById(id);
     };
+
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
+
   const onDrop =
     (targetDisplayIndex: number) => (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       const id = e.dataTransfer.getData("text/canvas-id");
       if (!id) return;
-      const toArrayIndex = elements.length - 1 - targetDisplayIndex; // convert from reversed
-      dispatch(moveElementToIndex({ id, to: toArrayIndex }));
+      // convert from reversed display index → array index
+      const toArrayIndex = elements.length - 1 - targetDisplayIndex;
+      moveToIndex(id, toArrayIndex);
     };
 
   const iconFor = (el: AnyEl) => {
@@ -99,6 +86,7 @@ export default function Sidebar() {
         return null;
     }
   };
+
   const titleFor = (el: AnyEl) =>
     el.name ?? `${el.type.charAt(0).toUpperCase()}${el.type.slice(1)}`;
   const metaFor = (el: AnyEl) => el.type;
@@ -175,7 +163,7 @@ export default function Sidebar() {
   return (
     <aside className="lg:pl-1">
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm shadow-xl shadow-black/30 overflow-hidden">
-        {/* Header — Eye/Sort removed */}
+        {/* Header */}
         <div className="flex items-center justify-between px-4 h-11 border-b border-white/10">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-slate-200/90" />
@@ -183,7 +171,6 @@ export default function Sidebar() {
               Elements
             </h2>
           </div>
-          {/* (right side empty by request) */}
           <div />
         </div>
 
@@ -201,10 +188,9 @@ export default function Sidebar() {
                 onDragStart={onDragStart(el.id, displayIndex)}
                 onDragOver={onDragOver}
                 onDrop={onDrop(displayIndex)}
-                onClick={() => dispatch(select(el.id))}
+                onClick={() => selectById(el.id)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ")
-                    dispatch(select(el.id));
+                  if (e.key === "Enter" || e.key === " ") selectById(el.id);
                 }}
                 className={`outline-none ${isSelected ? "bg-white/8" : ""}`}
               >
@@ -219,7 +205,7 @@ export default function Sidebar() {
                   coords={coordsFor(el)}
                   onDelete={(e) => {
                     e.stopPropagation();
-                    dispatch(removeElement(el.id));
+                    remove(el.id);
                   }}
                 />
               </div>
@@ -227,7 +213,7 @@ export default function Sidebar() {
           })}
         </div>
 
-        {/* Footer controls (keep) */}
+        {/* Footer controls */}
         <div className="px-3 py-2 border-t border-white/10 flex items-center justify-between">
           <div className="text-[11px] text-slate-300/70">
             Drag to reorder layers (controls z-index)

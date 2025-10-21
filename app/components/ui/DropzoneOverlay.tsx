@@ -31,31 +31,50 @@ export default function DropzoneOverlay({
   });
 
   useEffect(() => {
+    // robust check across browsers
+    const isDraggingFiles = (dt: DataTransfer | null) => {
+      if (!dt) return false;
+      // Most browsers expose a "Files" type when dragging files
+      if (dt.types && Array.prototype.includes.call(dt.types, "Files"))
+        return true;
+      // Fallback (e.g., Firefox)
+      const items = Array.from(dt.items || []);
+      return items.some((it) => it.kind === "file");
+    };
+
+    let fileDragActive = false; // track whether the *current* drag is a file drag
+
     const onDragEnter = (e: DragEvent) => {
-      if (!e.dataTransfer) return;
-      // Only activate if at least one file is being dragged
-      const hasFile = Array.from(e.dataTransfer.items || []).some(
-        (it) => it.kind === "file"
-      );
-      if (!hasFile) return;
+      if (!isDraggingFiles(e.dataTransfer)) return;
+      fileDragActive = true;
       dragDepthRef.current += 1;
       setActive(true);
     };
 
     const onDragOver = (e: DragEvent) => {
-      // Allow drop
+      // Only allow drop + show overlay if we're dragging files
+      if (!isDraggingFiles(e.dataTransfer)) return;
       e.preventDefault();
+      if (!fileDragActive) {
+        fileDragActive = true;
+        dragDepthRef.current = 1; // reset depth when we newly detect files
+      }
       if (!active) setActive(true);
     };
 
-    const onDragLeave = () => {
+    const onDragLeave = (e: DragEvent) => {
+      if (!fileDragActive) return; // ignore non-file drags
       dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-      if (dragDepthRef.current === 0) setActive(false);
+      if (dragDepthRef.current === 0) {
+        fileDragActive = false;
+        setActive(false);
+      }
     };
 
     const onDrop = async (e: DragEvent) => {
-      e.preventDefault();
+      if (isDraggingFiles(e.dataTransfer)) e.preventDefault();
       dragDepthRef.current = 0;
+      fileDragActive = false;
       setActive(false);
       if (!e.dataTransfer) return;
 
@@ -65,11 +84,9 @@ export default function DropzoneOverlay({
       );
       if (files.length === 0) return;
 
-      // Add sequentially (keeps memory usage tame)
       for (const file of files) {
         try {
-          // This preserves aspect ratio and centers on the canvas
-          await addImageFromFile(file);
+          await addImageFromFile(file); // centers & preserves aspect ratio
         } catch {
           // ignore individual file failures
         }

@@ -1,8 +1,5 @@
 "use client";
 import React from "react";
-import { createSelector } from "@reduxjs/toolkit";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import type { RootState } from "@/store";
 import type {
   AnyEl,
   RectEl,
@@ -11,16 +8,8 @@ import type {
   ArrowEl,
   CircleEl,
 } from "@/types/canvas";
-import { updateElement } from "@/store/canvasSlice";
 import { EditIcon, Pipette, SlidersHorizontal } from "lucide-react";
-
-// —— selector: selected element OR null (stable, memoized)
-const selectedSel = createSelector(
-  (s: RootState) => s.canvas.elements,
-  (s: RootState) => s.canvas.selectedId,
-  (els, id) =>
-    id ? (els.find((e) => e.id === id) as AnyEl | undefined) ?? null : null
-);
+import { useCanvas } from "@/hooks/useCanvas";
 
 // —— small UI atoms matching your sidebar style
 function Row({ children }: { children: React.ReactNode }) {
@@ -111,15 +100,12 @@ function Toggle({
 }
 
 export default function ElementInspector() {
-  const dispatch = useAppDispatch();
-  const selected = useAppSelector(selectedSel);
+  const { selected, update } = useCanvas({ stageWidth: 0 });
 
-  // ——— Header title is stable whether there is a selection or not
   const panelTitle = selected
     ? `Inspector — ${selected.type[0].toUpperCase()}${selected.type.slice(1)}`
     : "Inspector — No element selected";
 
-  // ——— Per-type renderers
   const renderRect = (el: RectEl & { cornerRadius?: number }) => {
     const isRounded = (el.cornerRadius ?? 0) > 0;
     return (
@@ -131,11 +117,10 @@ export default function ElementInspector() {
           </Label>
           <ColorInput
             value={el.fill}
-            onChange={(v) =>
-              dispatch(updateElement({ id: el.id, patch: { fill: v } }))
-            }
+            onChange={(v) => update(el.id, { fill: v })}
           />
         </Row>
+
         <Row>
           <Label>
             <SlidersHorizontal className="w-4 h-4" />
@@ -144,17 +129,13 @@ export default function ElementInspector() {
           <Toggle
             checked={isRounded}
             onChange={(on) =>
-              dispatch(
-                updateElement({
-                  id: el.id,
-                  patch: {
-                    cornerRadius: on ? Math.max(8, el.cornerRadius ?? 12) : 0,
-                  },
-                })
-              )
+              update(el.id, {
+                cornerRadius: on ? Math.max(8, el.cornerRadius ?? 12) : 0,
+              })
             }
           />
         </Row>
+
         {isRounded && (
           <Row>
             <Label>Corner radius</Label>
@@ -164,12 +145,7 @@ export default function ElementInspector() {
               max={64}
               step={1}
               onChange={(v) =>
-                dispatch(
-                  updateElement({
-                    id: el.id,
-                    patch: { cornerRadius: Math.max(0, Math.min(64, v)) },
-                  })
-                )
+                update(el.id, { cornerRadius: Math.max(0, Math.min(64, v)) })
               }
             />
           </Row>
@@ -185,20 +161,14 @@ export default function ElementInspector() {
         <input
           className="h-8 w-40 rounded-md border border-white/10 bg-white/10 px-2 text-[12px] text-slate-100"
           value={el.text}
-          onChange={(e) =>
-            dispatch(
-              updateElement({ id: el.id, patch: { text: e.target.value } })
-            )
-          }
+          onChange={(e) => update(el.id, { text: e.target.value })}
         />
       </Row>
       <Row>
         <Label>Color</Label>
         <ColorInput
           value={el.fill}
-          onChange={(v) =>
-            dispatch(updateElement({ id: el.id, patch: { fill: v } }))
-          }
+          onChange={(v) => update(el.id, { fill: v })}
         />
       </Row>
     </>
@@ -209,9 +179,7 @@ export default function ElementInspector() {
       <Label>Fill</Label>
       <ColorInput
         value={el.fill}
-        onChange={(v) =>
-          dispatch(updateElement({ id: el.id, patch: { fill: v } }))
-        }
+        onChange={(v) => update(el.id, { fill: v })}
       />
     </Row>
   );
@@ -225,9 +193,7 @@ export default function ElementInspector() {
         </Label>
         <ColorInput
           value={el.fill}
-          onChange={(v) =>
-            dispatch(updateElement({ id: el.id, patch: { fill: v } }))
-          }
+          onChange={(v) => update(el.id, { fill: v })}
         />
       </Row>
       <Row>
@@ -238,14 +204,9 @@ export default function ElementInspector() {
           max={Math.max(2, el.outerRadius - 2)}
           step={1}
           onChange={(v) =>
-            dispatch(
-              updateElement({
-                id: el.id,
-                patch: {
-                  innerRadius: Math.max(1, Math.min(v, el.outerRadius - 2)),
-                },
-              })
-            )
+            update(el.id, {
+              innerRadius: Math.max(1, Math.min(v, el.outerRadius - 2)),
+            })
           }
         />
       </Row>
@@ -260,14 +221,11 @@ export default function ElementInspector() {
       </Label>
       <ColorInput
         value={el.stroke}
-        onChange={(v) =>
-          dispatch(updateElement({ id: el.id, patch: { stroke: v } }))
-        }
+        onChange={(v) => update(el.id, { stroke: v })}
       />
     </Row>
   );
 
-  // ——— Route by type (or neutral message when none)
   let content: React.ReactNode;
   if (!selected) {
     content = (
