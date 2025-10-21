@@ -3,6 +3,7 @@ import Footer from "./components/Footer";
 import Header from "./components/Header";
 import Sidebar from "./components/sidebar/SidebarPanel";
 import Toolbar from "./components/Toolbar";
+import KeyboardShortcuts from "./components/KeyboardShortcuts";
 
 export default function Page() {
   return (
@@ -18,6 +19,7 @@ export default function Page() {
         </div>
       </main>
       <Footer />
+      <KeyboardShortcuts />
     </div>
   );
 }
