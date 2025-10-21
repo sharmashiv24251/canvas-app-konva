@@ -24,10 +24,13 @@ export type ImageEl = BaseEl & {
 };
 
 export type ArrowEl = BaseEl & {
-  type: "arrow";
-  points: [number, number, number, number]; // x1,y1,x2,y2
-  stroke: string; strokeWidth: number;
-};
+    type: "arrow";
+    x: number;
+    y: number;
+    points: [number, number, number, number];
+    stroke: string;
+    strokeWidth: number;
+  };
 
 export type TextEl = BaseEl & {
   type: "text";

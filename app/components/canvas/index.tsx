@@ -459,6 +459,8 @@ export default function Canvas() {
                 return (
                   <KonvaArrow
                     key={el.id}
+                    x={el.x}
+                    y={el.y}
                     ref={(node) => {
                       shapeRefs.current[el.id] = node;
                     }}
@@ -473,7 +475,8 @@ export default function Canvas() {
                         updateElement({
                           id: el.id,
                           patch: {
-                            /* keep same points, just move via x/y */
+                            x: e.target.x(),
+                            y: e.target.y(),
                           },
                         })
                       )

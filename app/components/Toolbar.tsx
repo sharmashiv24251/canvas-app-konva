@@ -120,15 +120,18 @@ export default function Toolbar() {
   const addArrow = () => {
     const { cx, cy } = getCenter();
     const len = 160;
-    const el: Partial<ArrowEl> = {
-      type: "arrow",
-      points: [cx - len / 2, cy, cx + len / 2, cy],
-      stroke: "#111827",
-      strokeWidth: 4,
-      rotation: 0,
-      name: "Arrow",
-    };
-    dispatch(addElement(el));
+    dispatch(
+      addElement({
+        type: "arrow",
+        x: cx - Math.round(len / 2),
+        y: cy,
+        points: [0, 0, len, 0],
+        stroke: "#111827",
+        strokeWidth: 4,
+        rotation: 0,
+        name: "Arrow",
+      })
+    );
   };
 
   const addText = () => {
