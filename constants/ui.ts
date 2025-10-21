@@ -1,6 +1,3 @@
-export const CANVAS_SHELL_ID = "canvas-shell";
-
-
 export const TRANSFORMER_STYLE = {
   anchorStroke: "#6366f1",
   anchorFill: "#ffffff",

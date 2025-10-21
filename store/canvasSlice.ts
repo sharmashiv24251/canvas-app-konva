@@ -6,10 +6,15 @@ import { INITIAL_CANVAS_STATE } from "@/constants";
 
 const MAX_HISTORY = 10;
 
-const initialState: CanvasState = { ...INITIAL_CANVAS_STATE, past: [], future: [] };
+// Empty initial state for SSR
+const initialState: CanvasState = {
+  elements: [],
+  selectedId: null,
+  past: [],
+  future: []
+};
 
 function pushHistory(state: CanvasState) {
-  // cap at 10
   if (state.past.length >= MAX_HISTORY) state.past.shift();
   state.past.push({ elements: state.elements, selectedId: state.selectedId });
   state.future = [];
@@ -57,7 +62,6 @@ const canvasSlice = createSlice({
       const prev = state.past.pop();
       if (!prev) return;
       const present = { elements: state.elements, selectedId: state.selectedId };
-      // cap future too (optional)
       state.future.unshift(present);
       if (state.future.length > MAX_HISTORY) state.future.pop();
       state.elements = prev.elements;
@@ -66,7 +70,6 @@ const canvasSlice = createSlice({
     redo(state) {
       const next = state.future.shift();
       if (!next) return;
-      // cap past on redo push
       if (state.past.length >= MAX_HISTORY) state.past.shift();
       state.past.push({ elements: state.elements, selectedId: state.selectedId });
       state.elements = next.elements;
