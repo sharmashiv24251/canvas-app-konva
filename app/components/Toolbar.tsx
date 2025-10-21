@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useRef, useState } from "react";
 import {
   Circle as CircleIcon,
@@ -7,8 +8,6 @@ import {
   Trash2,
   Undo2,
   Redo2,
-  ZoomIn,
-  Ruler,
   ArrowRight,
   Type as TypeIcon,
   CircleDashed,
@@ -16,17 +15,10 @@ import {
 import IconButton from "./ui/IconButton";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { addElement, removeElement, undo, redo } from "@/store/canvasSlice";
-import type {
-  RectEl,
-  CircleEl,
-  ImageEl,
-  ArrowEl,
-  TextEl,
-  RingEl,
-} from "@/types/canvas";
+import type { RectEl, CircleEl, TextEl, RingEl } from "@/types/canvas";
 import { createSelector } from "@reduxjs/toolkit";
 import type { RootState } from "@/store";
-import { loadImageSize } from "@/lib/helpers";
+import { useAddImageToCanvas } from "@/hooks/useAddImageToCanvas";
 
 const STAGE_HEIGHT = 620;
 
@@ -42,7 +34,13 @@ export default function Toolbar() {
   const dispatch = useAppDispatch();
   const { selectedId, pastLen, futureLen } = useAppSelector(toolbarSel);
 
-  // 🔧 All hooks must be declared before any conditional return:
+  // Shared image-adding logic (keeps aspect ratio, centers on canvas)
+  const { addImageFromFile, addImageFromSrc } = useAddImageToCanvas({
+    canvasShellId: "canvas-shell",
+    stageHeight: STAGE_HEIGHT,
+    targetWidth: 200,
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hydration-safe: render after mount to avoid SSR attr mismatches
@@ -68,48 +66,13 @@ export default function Toolbar() {
     e
   ) => {
     const file = e.target.files?.[0];
-
-    // object URL when chosen, fallback to your default asset
-    const src = file ? URL.createObjectURL(file) : "/images/canvas-01.jpg";
-
-    // read natural size
-    let natW = 0,
-      natH = 0;
-    try {
-      const meta = await loadImageSize(src);
-      natW = meta.width;
-      natH = meta.height;
-    } catch {
-      // safe fallback if metadata load fails
-      natW = 360;
-      natH = 220;
+    if (file) {
+      await addImageFromFile(file);
+    } else {
+      // fallback to your default asset if no file chosen
+      await addImageFromSrc("/images/canvas-01.jpg", "Image");
     }
-
-    // keep your fixed width; compute height from aspect
-    const targetW = 200;
-    const targetH = Math.round(targetW * (natH / natW || 220 / 360));
-
-    const { cx, cy } = getCenter();
-    const x = cx - Math.round(targetW / 2);
-    const y = cy - Math.round(targetH / 2);
-
-    const el: Partial<ImageEl> = {
-      type: "image",
-      x,
-      y,
-      width: targetW,
-      height: targetH,
-      src,
-      rotation: 0,
-      name: "Image",
-    };
-    dispatch(addElement(el));
-
-    // clear input for next pick
     if (fileInputRef.current) fileInputRef.current.value = "";
-
-    // (optional) free memory if you won't reuse this URL elsewhere:
-    // if (file) setTimeout(() => URL.revokeObjectURL(src), 0);
   };
 
   // Adders (centered)
