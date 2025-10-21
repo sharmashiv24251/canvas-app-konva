@@ -1,6 +1,5 @@
 "use client";
 import { Sparkles, User, ImageIcon } from "lucide-react";
-import IconButton from "./ui/IconButton";
 
 export default function Header() {
   return (
