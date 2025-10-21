@@ -10,94 +10,11 @@ import type {
 } from "@/types/canvas";
 import { EditIcon, Pipette, SlidersHorizontal } from "lucide-react";
 import { useCanvas } from "@/hooks/useCanvas";
-
-// —— small UI atoms matching your sidebar style
-function Row({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-4 py-3 flex items-center justify-between gap-3">
-      {children}
-    </div>
-  );
-}
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[12px] text-slate-300/80 flex items-center gap-2">
-      {children}
-    </div>
-  );
-}
-function ColorInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <input
-      type="color"
-      className="h-8 w-12 rounded-md border border-white/10 bg-white/10"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-function NumberInput({
-  value,
-  min = 0,
-  max = 1000,
-  step = 1,
-  onChange,
-  className = "",
-}: {
-  value: number;
-  min?: number;
-  max?: number;
-  step?: number;
-  onChange: (v: number) => void;
-  className?: string;
-}) {
-  return (
-    <input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={Number.isFinite(value) ? value : 0}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className={
-        "h-8 w-24 rounded-md border border-white/10 bg-white/10 px-2 text-[12px] text-slate-100 " +
-        className
-      }
-    />
-  );
-}
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={
-        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors " +
-        (checked ? "bg-indigo-500/80" : "bg-white/10")
-      }
-      aria-pressed={checked}
-    >
-      <span
-        className={
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform " +
-          (checked ? "translate-x-5" : "translate-x-1")
-        }
-      />
-    </button>
-  );
-}
+import Row from "./ui/Row";
+import Label from "./ui/Label";
+import ColorInput from "./ui/ColorInput";
+import NumberInput from "./ui/NumberInput";
+import Toggle from "./ui/Toggle";
 
 export default function ElementInspector() {
   const { selected, update } = useCanvas({ stageWidth: 0 });
