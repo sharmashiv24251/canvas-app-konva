@@ -286,7 +286,7 @@ export default function Canvas() {
       <div className="relative rounded-2xl border border-white/10 bg-white overflow-hidden shadow-2xl shadow-black/40">
         {/* REAL canvas wrapper (bounds) */}
         <div
-          id="envo-canvas-shell"
+          id="canvas-shell"
           ref={canvasRef}
           className="relative mx-6 mt-12 rounded-xl overflow-hidden"
           style={{ height: `${STAGE_HEIGHT}px` }}

@@ -51,7 +51,7 @@ export default function Toolbar() {
   if (!mounted) return null;
 
   const getCenter = () => {
-    const shell = document.getElementById("envo-canvas-shell");
+    const shell = document.getElementById("canvas-shell");
     const width = shell?.clientWidth ?? window.innerWidth;
     const height = STAGE_HEIGHT;
     return {

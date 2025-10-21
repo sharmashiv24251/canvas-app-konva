@@ -67,15 +67,15 @@ export default function Sidebar() {
   const onDragStart =
     (id: string, displayIndex: number) =>
     (e: React.DragEvent<HTMLDivElement>) => {
-      e.dataTransfer.setData("text/envo-id", id);
-      e.dataTransfer.setData("text/envo-display-index", String(displayIndex));
+      e.dataTransfer.setData("text/canvas-id", id);
+      e.dataTransfer.setData("text/canvas-display-index", String(displayIndex));
       dispatch(select(id));
     };
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
   const onDrop =
     (targetDisplayIndex: number) => (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const id = e.dataTransfer.getData("text/envo-id");
+      const id = e.dataTransfer.getData("text/canvas-id");
       if (!id) return;
       const toArrayIndex = elements.length - 1 - targetDisplayIndex; // convert from reversed
       dispatch(moveElementToIndex({ id, to: toArrayIndex }));
