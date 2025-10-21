@@ -26,6 +26,7 @@ import type {
 } from "@/types/canvas";
 import { createSelector } from "@reduxjs/toolkit";
 import type { RootState } from "@/store";
+import { loadImageSize } from "@/lib/helpers";
 
 const STAGE_HEIGHT = 620;
 
@@ -63,26 +64,52 @@ export default function Toolbar() {
 
   const triggerImagePicker = () => fileInputRef.current?.click();
 
-  const onImagePicked: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+  const onImagePicked: React.ChangeEventHandler<HTMLInputElement> = async (
+    e
+  ) => {
     const file = e.target.files?.[0];
-    const { cx, cy } = getCenter();
-    const w = 360,
-      h = 220;
-    const x = cx - Math.round(w / 2);
-    const y = cy - Math.round(h / 2);
+
+    // object URL when chosen, fallback to your default asset
     const src = file ? URL.createObjectURL(file) : "/images/canvas-01.jpg";
+
+    // read natural size
+    let natW = 0,
+      natH = 0;
+    try {
+      const meta = await loadImageSize(src);
+      natW = meta.width;
+      natH = meta.height;
+    } catch {
+      // safe fallback if metadata load fails
+      natW = 360;
+      natH = 220;
+    }
+
+    // keep your fixed width; compute height from aspect
+    const targetW = 200;
+    const targetH = Math.round(targetW * (natH / natW || 220 / 360));
+
+    const { cx, cy } = getCenter();
+    const x = cx - Math.round(targetW / 2);
+    const y = cy - Math.round(targetH / 2);
+
     const el: Partial<ImageEl> = {
       type: "image",
       x,
       y,
-      width: w,
-      height: h,
+      width: targetW,
+      height: targetH,
       src,
       rotation: 0,
       name: "Image",
     };
     dispatch(addElement(el));
+
+    // clear input for next pick
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // (optional) free memory if you won't reuse this URL elsewhere:
+    // if (file) setTimeout(() => URL.revokeObjectURL(src), 0);
   };
 
   // Adders (centered)

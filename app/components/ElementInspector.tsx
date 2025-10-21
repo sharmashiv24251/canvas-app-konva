@@ -117,7 +117,7 @@ export default function ElementInspector() {
   // ——— Header title is stable whether there is a selection or not
   const panelTitle = selected
     ? `Inspector — ${selected.type[0].toUpperCase()}${selected.type.slice(1)}`
-    : "Inspector — No selection";
+    : "Inspector — No element selected";
 
   // ——— Per-type renderers
   const renderRect = (el: RectEl & { cornerRadius?: number }) => {

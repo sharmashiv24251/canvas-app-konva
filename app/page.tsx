@@ -5,6 +5,7 @@ import Sidebar from "./components/sidebar/SidebarPanel";
 import Toolbar from "./components/Toolbar";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import ElementInspector from "./components/ElementInspector";
+import DropzoneOverlay from "./components/ui/DropzoneOverlay";
 
 export default function Page() {
   return (
@@ -24,6 +25,7 @@ export default function Page() {
       </main>
       <Footer />
       <KeyboardShortcuts />
+      <DropzoneOverlay />
     </div>
   );
 }
