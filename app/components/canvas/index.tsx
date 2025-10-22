@@ -30,7 +30,7 @@ import type {
   RingEl,
   TextEl,
   ArrowEl,
-} from "@/types/canvas"; // <-- your path: "@/types/canvas"
+} from "@/types/canvas";
 
 /** Pure image node (no Redux). */
 function ImageNode({
@@ -69,10 +69,8 @@ function ImageNode({
 }
 
 export default function Canvas() {
-  // 1) Stage size from ResizeObserver (no Redux)
   const { containerRef, width: stageW } = useStageSize();
 
-  // 2) All canvas logic hidden in the hook (Redux inside the hook only)
   const {
     elements,
     selectedId,
@@ -109,7 +107,7 @@ export default function Canvas() {
         <div
           id={CANVAS_SHELL_ID}
           ref={containerRef}
-          className="relative mx-6 mt-12 rounded-xl overflow-hidden"
+          className="relative mx-2 my-2 rounded-xl overflow-hidden"
           style={{ height: `${STAGE_HEIGHT}px` }}
         >
           <div className="pointer-events-none absolute inset-0 rounded-xl border-2 border-dashed border-slate-900/10 opacity-0 hover:opacity-100 transition-opacity" />

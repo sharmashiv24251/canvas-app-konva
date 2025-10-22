@@ -1,8 +1,7 @@
-// src/store/canvasSlice.ts
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { AnyEl, CanvasState } from "@/types/canvas";
 import { nanoid } from "nanoid";
-import { INITIAL_CANVAS_STATE } from "@/constants";
+
 
 const MAX_HISTORY = 10;
 

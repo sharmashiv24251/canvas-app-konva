@@ -27,7 +27,7 @@ import type {
 import { clamp, arrowBBoxFromPoints } from "@/lib/helpers";
 
 import { STAGE_HEIGHT } from "@/constants/canvas";
-// import { TRANSFORMER_STYLE } from "@/constants/ui"; // (unused here)
+
 import {
   RECT_MIN,
   IMAGE_MIN,
@@ -36,7 +36,6 @@ import {
   RING_MIN,
   ARROW_MIN,
   RECT_DEFAULTS,
-  IMAGE_DEFAULTS,
   TEXT_DEFAULTS,
   CIRCLE_DEFAULTS,
   RING_DEFAULTS,
@@ -59,7 +58,6 @@ const sel = createSelector(
 );
 
 type UseCanvasArgs = {
-  /** Current stage width (from useStageSize). Required for bounds. */
   stageWidth: number;
 };
 

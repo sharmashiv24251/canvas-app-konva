@@ -1,4 +1,3 @@
-// src/store/index.ts
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import canvasReducer from "./canvasSlice";
 import { INITIAL_CANVAS_STATE } from "@/constants";

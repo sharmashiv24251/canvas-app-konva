@@ -15,14 +15,10 @@ import {
 import IconButton from "./ui/IconButton";
 
 import { useAddImageToCanvas } from "@/hooks/useAddImageToCanvas";
-import { useCanvas } from "@/hooks/useCanvas"; // ← unified hook we defined
-import { CANVAS_SHELL_ID, STAGE_HEIGHT } from "@/constants"; // ← your constants
-
-import type { RectEl, CircleEl, TextEl, RingEl } from "@/types/canvas";
+import { useCanvas } from "@/hooks/useCanvas";
+import { CANVAS_SHELL_ID, STAGE_HEIGHT } from "@/constants";
 
 export default function Toolbar() {
-  // stage width is needed by useCanvas for bounds;
-  // for Toolbar we can read it on demand (SSR-safe)
   const getCenter = () => {
     const shell =
       typeof document !== "undefined"
@@ -39,11 +35,20 @@ export default function Toolbar() {
     return { cx, cy, width };
   };
 
-  // Core canvas hook — hides Redux. Pass stageWidth for accurate bounds.
   const { width } = getCenter();
-  const { selectedId, remove, add, undo, redo, canUndo, canRedo } = useCanvas({
-    stageWidth: width,
-  });
+  const {
+    selectedId,
+    remove,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    addRectangle,
+    addCircle,
+    addRing,
+    addText,
+    addArrow,
+  } = useCanvas({ stageWidth: width });
 
   // Image adder (also hides Redux)
   const { addImageFromFile, addImageFromSrc } = useAddImageToCanvas({
@@ -74,83 +79,6 @@ export default function Toolbar() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Adders (centered)
-  const addRectangle = () => {
-    const { cx, cy } = getCenter();
-    const w = 320,
-      h = 200;
-    const el: Partial<RectEl> = {
-      type: "rect",
-      x: cx - w / 2,
-      y: cy - h / 2,
-      width: w,
-      height: h,
-      fill: "#87CEEB",
-      rotation: 0,
-      name: "Rectangle",
-    };
-    add(el);
-  };
-
-  const addCircle = () => {
-    const { cx, cy } = getCenter();
-    const el: Partial<CircleEl> = {
-      type: "circle",
-      cx,
-      cy,
-      radius: 90,
-      fill: "#f3f4f6",
-      rotation: 0,
-      name: "Circle",
-    };
-    add(el);
-  };
-
-  const addArrow = () => {
-    const { cx, cy } = getCenter();
-    const len = 160;
-    add({
-      type: "arrow",
-      x: cx - Math.round(len / 2),
-      y: cy,
-      points: [0, 0, len, 0],
-      stroke: "#111827",
-      strokeWidth: 4,
-      rotation: 0,
-      name: "Arrow",
-    });
-  };
-
-  const addText = () => {
-    const { cx, cy } = getCenter();
-    const el: Partial<TextEl> = {
-      type: "text",
-      x: cx - 60,
-      y: cy - 12,
-      text: "Text",
-      fontSize: 24,
-      fill: "#111827",
-      rotation: 0,
-      name: "Text",
-    };
-    add(el);
-  };
-
-  const addRing = () => {
-    const { cx, cy } = getCenter();
-    const el: Partial<RingEl> = {
-      type: "ring",
-      cx,
-      cy,
-      innerRadius: 60,
-      outerRadius: 100,
-      fill: "#FACC15",
-      rotation: 0,
-      name: "Ring",
-    };
-    add(el);
-  };
-
   const doDelete = () => {
     if (selectedId) remove(selectedId);
   };
@@ -163,14 +91,14 @@ export default function Toolbar() {
             <IconButton
               aria-label="Add Circle"
               tooltip="Add Circle"
-              onClick={addCircle}
+              onClick={() => addCircle()}
             >
               <CircleIcon className="w-[18px] h-[18px]" />
             </IconButton>
             <IconButton
               aria-label="Add Rectangle"
               tooltip="Add Rectangle"
-              onClick={addRectangle}
+              onClick={() => addRectangle()}
             >
               <Square className="w-[18px] h-[18px]" />
             </IconButton>
@@ -191,21 +119,21 @@ export default function Toolbar() {
             <IconButton
               aria-label="Add Arrow"
               tooltip="Add Arrow"
-              onClick={addArrow}
+              onClick={() => addArrow()}
             >
               <ArrowRight className="w-[18px] h-[18px]" />
             </IconButton>
             <IconButton
               aria-label="Add Text"
               tooltip="Add Text"
-              onClick={addText}
+              onClick={() => addText()}
             >
               <TypeIcon className="w-[18px] h-[18px]" />
             </IconButton>
             <IconButton
               aria-label="Add Ring"
               tooltip="Add Ring"
-              onClick={addRing}
+              onClick={() => addRing()}
             >
               <CircleDashed className="w-[18px] h-[18px]" />
             </IconButton>

@@ -1,4 +1,3 @@
-// src/types/canvas.ts
 export type ElementType = "rect" | "circle" | "image" | "arrow" | "text" | "ring";
 
 export type BaseEl = {
@@ -12,7 +11,7 @@ export type RectEl = BaseEl & {
   type: "rect";
   x: number; y: number; width: number; height: number; fill: string;
   cornerRadius?: number;
-};
+};0
 
 export type CircleEl = BaseEl & {
   type: "circle";

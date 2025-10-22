@@ -16,8 +16,6 @@ export const KEY = {
   r: "r",
   c: "c",
   t: "t",
-
-  // 🔧 Add these:
   x: "x",  // Cut
   v: "v",  // Paste
 };
